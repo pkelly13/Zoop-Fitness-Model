@@ -4,40 +4,6 @@
 require(deSolve)
 
 timestep<-function(t,y,params){
-	FQphyt=params[1]
-	PHYT=params[2]
-	FQdet=params[3]
-	DETc=params[4]
-	aC1=params[5]
-	aC2=params[6]
-	lambda=params[7]
-	wPhyt=params[8]
-	wDet=params[9]
-	mu=params[10]
-	PCphyt=params[11]
-	fEPA=params[12]
-	fDHA=params[13]
-	sPC=params[14]
-	sEPA=params[15]
-	sDHA=params[16]
-	tP=params[17]
-	tEPA=params[18]
-	tDHA=params[19]
-	tM=params[20]
-	m=params[21]
-	v=params[22]
-	e=params[23]
-	Pmin=params[24]
-	Popt=params[25]
-	EPAmin=params[26]
-	EPAopt=params[27]
-	DHAmin=params[28]
-	DHAopt=params[29]
-	X=params[30]
-	hEPA=params[31]
-	hDHA=params[32]
-	r=params[33]
-
 with(as.list(params),{	
 	Pint<-y[1]
 	EPAint<-y[2]
@@ -73,6 +39,12 @@ EPApm<-(1-e)*(aSC*GRAZepa-EPAint*(tEPA*(1-m)+m*tM))
 
 DHApm<-aSC*GRAZdha-DHAint*(tDHA*(1-m)+m*tM)+v*e*(aSC*GRAZepa-EPAint*(tEPA*(1-m)+m*tM))
 
+#make if statement for if post maintenance EPA and DHA concentrations are below a threshold, C18 PUFA elongation becomes important
+if(EPApm < thresh){
+	EPApm<-aSC*GRAZepa-EPAint*(tEPA*(1-m)+m*tM)+(1-e)*Jpufa*p
+	DHApm<-aSC*GRAZdha-DHAint*(tDHA*(1-m)+m*tM)+e*Jpufa*p*v
+}
+
 #resource saturation quotient (glimP, glimEPA, glimDHA) using internal quota of reosurces, optimal somatic concentration of resources, and minimal concentration of resources (Droop model)
 
 glimP<-(Pint-Pmin)/(Popt-Pmin)
@@ -102,17 +74,13 @@ return(list(c(Pint,EPAint,DHAint)))
 #test of the zooplankton growth submodel
 
 #establish parameters
-parms<-c(FQphyt=0.5,PHYT=0.4,FQdet=0.1,DETc=0.1,aC1=0.9,aC2=0.03,lambda=0.6,wPhyt=0.5,wDet=0.5,mu=0.035,PCphyt=0.05,fEPA=0.02,fDHA=0.001,sPC=0.00001,sEPA=0.00001,sDHA=0.00001,tP=0.1,tEPA=0.1,tDHA=0.1,tM=0.05,m=0.05,v=0.5,e=0.05,Pmin=0.009,Popt=0.05,EPAmin=0.0007,EPAopt=0.0082,DHAmin=0.0001,DHAopt=0.0014,X=0.25,hEPA=0.8,hDHA=0.8,r=0.9)
-
-parms2<-c(FQphyt=0.5,PHYT=0.6,FQdet=0.1,DETc=0.1,aC1=0.9,aC2=0.03,lambda=0.6,wPhyt=1.0,wDet=0,mu=0.035,PCphyt=0.005,fEPA=0.002,fDHA=0.001,sPC=0.00001,sEPA=0.00001,sDHA=0.00001,tP=0.1,tEPA=0.1,tDHA=0.1,tM=0.05,m=0.05,v=0.5,e=0.05,Pmin=0.009,Popt=0.05,EPAmin=0.0007,EPAopt=0.0082,DHAmin=0.0001,DHAopt=0.0014,X=0.25,hEPA=0.8,hDHA=0.8,r=0.9)
-
+parms<-c(FQphyt=0.5,PHYT=0.4,FQdet=0.1,DETc=0.1,aC1=0.9,aC2=0.03,lambda=0.6,wPhyt=0.5,wDet=0.5,mu=0.035,PCphyt=0.05,fEPA=0.02,fDHA=0.001,sPC=0.00001,sEPA=0.00001,sDHA=0.00001,tP=0.1,tEPA=0.1,tDHA=0.1,tM=0.05,m=0.05,v=0.5,e=0.05,Pmin=0.009,Popt=0.05,EPAmin=0.0007,EPAopt=0.0082,DHAmin=0.0001,DHAopt=0.0014,X=0.25,hEPA=0.8,hDHA=0.8,r=0.9,p=0.5,thresh=0.05,Jpufa=0.0118)
 
 times=seq(1,500,by=0.1)
 
 n=c(Pint=0.5,EPAint=0.5,DHAint=0.5)
 
 test<-ode(y=n,times=times,func=timestep,parms=parms)
-test2<-ode(y=n,times=times,func=timestep,parms=parms2)
 
 Pmin=0.009
 Popt=0.05
@@ -127,9 +95,4 @@ glimP<-(test[4991,2]-Pmin)/(Popt-Pmin)
 glimEPA<-(test[4991,3]-EPAmin)/(EPAopt-EPAmin)
 glimDHA<-(test[4991,4]-DHAmin)/(DHAopt-DHAmin)
 
-glimP2<-(test2[4991,2]-Pmin)/(Popt-Pmin)
-glimEPA2<-(test2[4991,3]-EPAmin)/(EPAopt-EPAmin)
-glimDHA2<-(test2[4991,4]-DHAmin)/(DHAopt-DHAmin)
-
 growth<-r*min(c(glimP,glimEPA,glimDHA))
-growth2<-r*min(glimP2,glimEPA2,glimDHA2)
