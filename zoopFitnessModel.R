@@ -4,11 +4,11 @@
 
 
 #Calculate u/g for each situation for each lake
-#+develop a function that will calculate u/g given a set of parameters - develop u from Jensen et al 2006 using reaction distances, swimming speeds, and predator density - use the submodel for growth rates
+#+develop a function that will calculate u/g given a set of parameters - develop u from Jensen et al 2006 using reaction distances, swimming speeds, and predator density - use the submodel for growth rates - alter growth rates by costs (O2, DO, etc.)
 
 #source zooplankton growth submodel - can use this function to determine growth rates in different environments
-setwd('~/Documents/Notre Dame/UNDERC 2013/zoop growth model')
-source('zoopGrowthSubmodel_11Mar2014.R')
+setwd('~/Zoop-Fitness-Model')
+source('zoopGrowthSubmodel.R')
 
 #run growth model on each row of model parameters
 growth<-c()
@@ -44,84 +44,8 @@ if(is.na(modelParms$mgC_L[i]) | is.na(modelParms$PC[i]) | is.na(modelParms$EPA_m
 }
 
 
-#Calculate growth rate
-#List of parameters - only need to change a few for differences in resource quality
-FQphyt=0.7 #food quality index for phytoplankton - dimless 
-PHYT=0.4 #food concentration of phytoplankton - mg C? <-----user input
-FQdet=0.1 #food quality of detritus - dimless
-DETc=0.1 #concentration of detritus - mg C?
-aC1=0.9 #zooplankton carbon assimilation efficiency - dimless
-aC2=0.03 #half sat constant for zoop growth efficiency - (mg C L-1)^1/2
-lambda=0.6 #maximum zooplankton grazing rate -  day^-1
-wPhyt=0.5 #phytoplankton food preference - dimless
-wDet=0.5 #detritus food preference - dimless
-mu=0.035 #zooplankton grazing half sat constant
-PCphyt=0.015 #phytoplankton P:C - mg P mg C^-1 <----User input
-fEPA=0.01 #phytoplankton EFA:C - mg EPA mg C^-1 <----User input
-fDHA=0.0003 #phytoplankton DHA:C - mg DHA mg C^-1
-sPC=0.001 #detritus P:C - mg P mg C^-1
-sEPA=0.00001 #detritus EPA:C - mg EPA mg C^-1
-sDHA=0.00001 #detritus DHA:C - mg DHA mg C^-1
-tP=0.1 #zooplankton P biomass turnover rate - day ^-1
-tEPA=0.1 #zooplankton biomass EPA turnover rate - day^-1
-tDHA=0.1 #zooplankton biomass DHA turnover rate - day ^-1
-tM=0.05 #zooplankton moult P turnover rate - day^-1
-m=0.05 #moult as a fraction of zoop biomass - dimless
-v=0.5 #conversion efficiency of EPA to DHA - mg DHA mg EPA^-1
-e=0.05 #fraction of EPA to DHA via conversion - dimless
-Pmin=0.009 #minimum zooplankton somatic P - mg P mg C^-1
-Popt=0.05 #optimal zooplankton somatic P - mg P mg C^-1
-EPAmin=0.0007 #minimum zooplankton somatic EPA - mg EPA mg C-1
-EPAopt=0.0082 #Optimum zooplankton somatic EPA - mg EPA mg C-1
-DHAmin=0.0001 #minimum zooplankton somatic DHA - mg DHA mg C-1
-DHAopt=0.0014 #Optimum zooplankton somatic DHA - mg DHA mg C^-1
-X=0.25 #Excretion rate - day^-1
-hEPA=0.8 #proxy reproduction paramter
-hDHA=0.8 #proxy reproduction parameter
-r=0.9 # growth rate
-
-parms<-c(FQphyt=FQphyt,PHYT=PHYT,FQdet=FQdet,DETc=DETc,aC1=aC1,aC2=aC2,lambda=lambda,wPhyt=wPhyt,wDet=wDet,mu=mu,PCphyt=PCphyt,fEPA=fEPA,fDHA=fDHA,sPC=sPC,sEPA=sEPA,sDHA=sDHA,tP=tP,tEPA=tEPA,tDHA=tDHA,tM=tM,m=m,v=v,e=e,Pmin=Pmin,Popt=Popt,EPAmin=EPAmin,EPAopt=EPAopt,DHAmin=DHAmin,DHAopt=DHAopt,X=X,hEPA=hEPA,hDHA=hDHA,r=r)
 
 
-#User input includes parameters for growth model, temperature, DO concentration, Chaoborus density, Bass/NoBass, and pvores (1 or 0), and proportion spent in each environment
-
-#Now, include ways of altering growth and death rates per environmental factors
-#need to calculate for both Epi and Hypo, and determine how much time spent in each habitat. i.e. for standard migration, calculate all parameters for night and day, then multiply by proportion of time spent in each habitat during the night and day, respectively.  Then average these together for use in the life table model
-
-#function will calculate u/g for one environment
-
-fit(rmax=0.9,times=seq(1,500,by=1),n=c(Pint=0.5,EPAint=0.5,DHAint=0.5),parms=parms,temp=16,DO=5.6,chaobDens=300,Bass=0,NoBass=1,pvores=1)
-
-fit<-function(rmax,times,n,parms,temp,DO,chaobDens,Bass,NoBass,pvores){
-	growth=ode(y=n,times=times,func=timestep,parm=parms)
-	glimP=growth[length(times)-2,2]
-	glimEPA=growth[length(times)-2,3]
-	glimDHA=growth[length(times)-2,4]
-	growth=rmax*min(glimP,glimEPA,glimDHA)
-	
-	growth=growth*exp(-0.015*abs(20-temp)^2)
-	
-	if(DO>=1.1){
-		s=1
-	}
-	if(DO<1.1 & DO>=0.2){
-		s=sqrt(1.111*(DO-0.2))
-	}
-	if(DO<0.2){
-		s=0
-	}
-	
-	Nm=0.015
-	Pchaob=(0.1095+(0.0001302*chaobDens))/1000
-	
-	Pfish=(0.15*NoBass)+(0.02*Bass)
-	Pfish=Pfish*pores
-	
-	mu=Pfish+Pchaob+Nm
-	
-	mu.g=mu/growth
-	return(mu.g)
-}
 
 #Epilimnion
 Topt<-20 #optimal temperature for zoop growth
