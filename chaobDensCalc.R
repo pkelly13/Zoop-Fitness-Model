@@ -6,6 +6,10 @@ setwd('~/Documents/Notre Dame/UNDERC 2013/zoopData 2013/R files')
 tot.chaob<-read.csv('tot.chaob.csv')
 tot.chaob$uniqueID<-paste(tot.chaob$lakeID,tot.chaob$dateSample,tot.chaob$TOD,sep='_')
 
+#load lakeParms data
+setwd('~/Documents/Notre Dame/UNDERC 2013/lakeParameters')
+lakeParms<-read.csv('2014lakeParameters.csv')
+
 #make vector of unique IDs
 id<-unique(tot.chaob$uniqueID)
 chaobDens<-c()
@@ -25,4 +29,5 @@ for(i in 1:length(id)){
 chaobDens$ind_m3<-(chaobDens$counts/15)*1000
 
 #write data to R files folder
+setwd('~/Documents/Notre Dame/UNDERC 2013/zoopData 2013/R files')
 write.csv(chaobDens,'2013chaoborusDensities.csv')
