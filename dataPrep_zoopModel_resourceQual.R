@@ -113,6 +113,7 @@ write.csv(resourceQual,'resourceQuality_growth model.csv')
 
 #Add chaoborus density to cn data
 #make unique IDs for cn and chaobDens data that correspond to bring in resource quality data into 
+setwd('~/Documents/Notre Dame/UNDERC 2013/zoopData 2013/R files')
 chaobDens<-read.csv('2013chaoborusDensities.csv')
 
 #aggregate resource quality data by lake date and depth
@@ -152,3 +153,101 @@ for(i in 1:nrow(chaobDens)){
 	modelParms=rbind(modelParms,samplei)
 }
 
+#Add date specific DO and temp for each lake and depth
+#need to load profile data from the dB
+profs<-dbGetQuery(con, 'SELECT profs.lakeID,profs.dateSample,profs.depthClass,profs.depthTop,profs.temp,profs.DOmgL,profs.PAR FROM LIMNO_PROFILES AS profs')
+#use only 2013 data
+profs<-addYear(profs)
+profs<-profs[profs$year==2013,]
+#fix dates
+profs$dateSample<-format(as.Date(profs$dateSample,'%Y-%m-%d %H:%M:%S'),'%m/%d/%y')
+
+#Need to get pml and meta depths from chlorophyll data - load from the database
+chl<-dbGetQuery(con,'SELECT chl.lakeID,chl.dateSample,chl.depthClass,chl.depthTop,chl.depthBottom FROM CHLOROPHYLL AS chl')
+#use only 2013 data
+chl<-addYear(chl)
+chl<-chl[chl$year==2013,]
+#fix dateSample
+chl$dateSample=format(as.Date(chl$dateSample,'%Y-%m-%d %H:%M:%S'),'%m/%d/%y')
+
+#find PML and meta depths
+depth<-c()
+for(i in 1:nrow(modelParms)){
+	samplei=modelParms[i,]
+	chlMatch=chl[chl$lakeID==samplei$lakeID,]
+	if(samplei$depthClass=='PML'){
+	pmlDepths=chlMatch[chlMatch$depthClass=='PML',]
+	pmlDepths=pmlDepths$depthBottom[which(abs(as.Date(pmlDepths$dateSample,'%m/%d/%y')-as.Date(samplei$dateSample,'%m/%d/%y'))==min(abs(as.Date(pmlDepths$dateSample,'%m/%d/%y')-as.Date(samplei$dateSample,'%m/%d/%y'))))]
+	depth[i]=mean(c(0,pmlDepths[1]))
+	}
+	else if(samplei$depthClass=='Hypo'){
+	metaDepths=chlMatch[chlMatch$depthClass=='Meta',]
+	metaDepths=metaDepths$depthBottom[which(abs(as.Date(metaDepths$dateSample,'%m/%d/%y')-as.Date(samplei$dateSample,'%m/%d/%y'))==min(abs(as.Date(metaDepths$dateSample,'%m/%d/%y')-as.Date(samplei$dateSample,'%m/%d/%y'))))]
+	depth[i]=metaDepths[1]
+	}
+}
+modelParms$depth=depth
+
+#match depths to DO and temp profiles to get corresponding data
+DOmgL<-c()
+temp<-c()
+PAR<-c()
+for(i in 1:nrow(modelParms)){
+	samplei=modelParms[i,]
+	profMatch=profs[profs$lakeID==samplei$lakeID,]
+	profMatch=profMatch[which(abs(profMatch$depthTop-samplei$depth)==min(abs(profMatch$depthTop-samplei$depth))),]
+	DOmgL[i]=profMatch$DOmgL[which(abs(as.Date(profMatch$dateSample,'%m/%d/%y')-as.Date(samplei$dateSample,'%m/%d/%y'))==min(abs(as.Date(profMatch$dateSample,'%m/%d/%y')-as.Date(samplei$dateSample,'%m/%d/%y'))))]
+	temp[i]=profMatch$temp[which(abs(as.Date(profMatch$dateSample,'%m/%d/%y')-as.Date(samplei$dateSample,'%m/%d/%y'))==min(abs(as.Date(profMatch$dateSample,'%m/%d/%y')-as.Date(samplei$dateSample,'%m/%d/%y'))))]
+	PAR[i]=profMatch$PAR[which(abs(as.Date(profMatch$dateSample,'%m/%d/%y')-as.Date(samplei$dateSample,'%m/%d/%y'))==min(abs(as.Date(profMatch$dateSample,'%m/%d/%y')-as.Date(samplei$dateSample,'%m/%d/%y'))))]
+}
+#change PAR for night samples to 0
+PAR[modelParms$TOD=='Night']=0
+PAR=as.numeric(PAR)
+
+#add to model Parms
+modelParms$DOmgL<-DOmgL
+modelParms$temp<-temp
+modelParms$PAR<-PAR
+
+#need to fill in NAs for PAR data - just use average for that depthclass for each lake - make table of lakes and PAR and match data to it
+pmlPAR<-tapply(modelParms$PAR[modelParms$depthClass=='PML'],modelParms$lakeID[modelParms$depthClass=='PML'],mean,na.rm=T)
+hypoPAR<-tapply(modelParms$PAR[modelParms$depthClass=='Hypo'],modelParms$lakeID[modelParms$depthClass=='Hypo'],mean,na.rm=T)
+parData<-data.frame(lakeID=rownames(pmlPAR),PML=pmlPAR,Hypo=hypoPAR)
+for(i in 1:nrow(modelParms)){
+	if(is.na(modelParms$PAR[i])){
+		if(modelParms$depthClass[i]=='PML'){
+			rowi=match(modelParms$lakeID[i],parData$lakeID)
+			modelParms$PAR[i]=parData$PML[rowi]
+		}
+		if(modelParms$depthClass[i]=='Hypo'){
+			rowi=match(modelParms$lakeID[i],parData$lakeID)
+			modelParms$PAR[i]=parData$Hypo[rowi]
+		}
+	}
+	else{
+		i=i+1
+	}
+}
+
+#Add CPUE data
+#load CPUE data
+setwd('~/Documents/Notre Dame/UNDERC 2013/zoopData 2013/R files')
+fish<-read.csv('fishCPUE.csv')
+
+fish<-fish[c(1,3,6,8,11,13),c(1,2)]
+
+fishAppend<-data.frame(lake=c('TU','CB','RE','RB'),nCPUE=c(fish[6,2],0,0,fish[1,2]))
+#combie estimated fish data
+fish<-rbind(fish,fishAppend)
+
+#Add to modelParms data
+CPUE<-c()
+for(i in 1:nrow(modelParms)){
+	rowi=match(modelParms$lakeID[i],fish$lake)
+	CPUE[i]=fish$nCPUE[rowi]
+}
+modelParms$CPUE=CPUE
+
+#write csv file to zoop model folder
+setwd('~/Documents/Notre Dame/UNDERC 2013/zoop growth model/R files')
+write.csv(modelParms,'modelParameters_forFitnessModel.csv')
