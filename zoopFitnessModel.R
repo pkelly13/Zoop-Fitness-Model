@@ -71,56 +71,37 @@ if(is.na(modelParms$mgC_L[i]) | is.na(modelParms$PC[i]) | is.na(modelParms$EPA_m
 
 modelParms$growth=growth
 
-#calculate mortality rates
-chaobDens<-400 #<---- USER INPUT	
-Pchaob<-0.1095+(0.0001302*chaobDens) #calculate predation rate for Daphnia from chaoborus
-Pchaob<-Pchaob/1000
+#Calculate mu for each lake - first do it with the predation rates taken from the literature
 
-chaob<-1 #turn on/off chaob predation.  If present, make 1.  If absent, make 0 <-----USER INPUT
-Pchaob<-Pchaob*chaob
+#turn on/off chaob predation
+#if chaob = 1, use equation from the literature
+#y=(0.1095+(0.0001302*density))/1000
+#turn on/off bass presence
+#need to make a table of lakes with bass and with planktivores
+fishTable<-data.frame(lakeID=unique(modelParms$lakeID),bass=c(0,1,0,0,1,1,1,1,1,1),BLGL=c(1,1,0,0,1,1,0,1,1,1))
+mu<-c()
+for(i in 1:nrow(modelParms)){
+	if(modelParms$ind_m3[i]>0){
+		chaob=1
+	}
+	if(modelParms$ind_m3[i]==0){
+		chaob=0
+	}
+	chaobPred=((0.1095+(0.0001302*modelParms$ind_m3[i]))/1000)*chaob
+	if(modelParms$depthClass[i]=='PML' & modelParms$TOD[i]=='Day'){
+		rowi=match(modelParms$lakeID[i],fishTable$lakeID)
+		bass=fishTable$bass[rowi]
+		nobass=1-bass
+		pvores=fishTable$BLGL[rowi]
+		Pfish=((0.15*nobass)+(0.02*bass))*pvores
+	}
+	mu[i]=Pfish+chaobPred
+}
+modelParms$mu=mu
 
-Bass<-0 #different fish predation rates if bass are present vs if bass are not present.  Different feeding behaviors of bluegill
-NoBass<-1 #Make Bass = 1 when bass are present, 0 when absent.  NoBass should be 1 when no bass are present, and 0 when bass are present
+#Calculate fitness - mu/g - smaller u/g value is the better situation
+modelParms$mu.g=exp(modelParms$mu)/exp(modelParms$growth)
 
-Pfish<-(0.15*Bass)+(0.02*NoBass) #Still need to get this from Brian's data
-
-pvores<-1 #can turn on/off planktivores.  If present make 1, if absent, make 0 <----- USER INPUT
-Pfish<-Pfish*pvores
-
-Ptot<-Pfish+Pchaob+Nm
-Ps<-1-Ptot
-
-Ps<-Ps*s
-
-#Calculate growth rate for epilimnion specifically
-#establish parameters
-parms<-c(FQphyt=0.7,PHYT=0.4,FQdet=0.1,DETc=0.1,aC1=0.9,aC2=0.03,lambda=0.6,wPhyt=0.5,wDet=0.5,mu=0.035,PCphyt=0.015,fEPA=0.01,fDHA=0.0003,sPC=0.00001,sEPA=0.00001,sDHA=0.00001,tP=0.1,tEPA=0.1,tDHA=0.1,tM=0.05,m=0.05,v=0.5,e=0.05,Pmin=0.009,Popt=0.05,EPAmin=0.0007,EPAopt=0.0082,DHAmin=0.0001,DHAopt=0.0014,X=0.25,hEPA=0.8,hDHA=0.8,r=0.9)
-
-times=seq(1,500,by=0.1)
-
-n=c(Pint=0.5,EPAint=0.5,DHAint=0.5)
-
-test<-ode(y=n,times=times,func=timestep,parms=parms)
-
-Pmin=0.009
-Popt=0.05
-EPAmin=0.0007
-EPAopt=0.0082
-DHAmin=0.0001
-DHAopt=0.0014
-r=0.9
-
-#calculate growth rate
-glimP<-(test[4991,2]-Pmin)/(Popt-Pmin)
-glimEPA<-(test[4991,3]-EPAmin)/(EPAopt-EPAmin)
-glimDHA<-(test[4991,4]-DHAmin)/(DHAopt-DHAmin)
-
-growth<-r*min(c(glimP,glimEPA,glimDHA))
-
-
-#Now proportion of time spent in the epilimnion
-pEpi<-0.4 #<------USER INPUT
-
-#multiply rates by proportion
-Ps.epi<-Ps*pEpi
-growth.epi<-growth*pEpi
+#write data to Zoop-Fitness-Model folder
+setwd('~/Zoop-Fitness-Model')
+write.csv(modelParms,'fitnessModel_parameters.csv')
