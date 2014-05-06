@@ -69,6 +69,7 @@ if(is.na(modelParms$mgC_L[i]) | is.na(modelParms$PC[i]) | is.na(modelParms$EPA_m
 }
 }
 
+modelParms$growth=growth
 
 #calculate mortality rates
 chaobDens<-400 #<---- USER INPUT	
