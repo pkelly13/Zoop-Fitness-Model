@@ -188,6 +188,9 @@ for(i in 1:nrow(modelParms)){
 }
 modelParms$depth=depth
 
+#need to get rid of 0.75m data
+profs=profs[profs$depthTop!=0.75,]
+
 #match depths to DO and temp profiles to get corresponding data
 DOmgL<-c()
 temp<-c()
@@ -226,6 +229,17 @@ for(i in 1:nrow(modelParms)){
 	}
 	else{
 		i=i+1
+	}
+}
+
+#for DO data that is 0 - replace with mean PML and Meta DO
+#load lakeParms
+setwd('~/Documents/Notre Dame/UNDERC 2013/lakeParameters')
+lakeParms<-read.csv('2014lakeParameters.csv')
+for(i in 1:nrow(modelParms)){
+	if(modelParms$DOmgL[i]==0 & modelParms$depthClass[i]=='PML'){
+		rowi=match(modelParms$lakeID[i],lakeParms$lakeID)
+		modelParms$DOmgL[i]=lakeParms$PML_DO[rowi]
 	}
 }
 
