@@ -6,9 +6,24 @@
 #Calculate u/g for each situation for each lake
 #+develop a function that will calculate u/g given a set of parameters - develop u from Jensen et al 2006 using reaction distances, swimming speeds, and predator density - use the submodel for growth rates - alter growth rates by costs (O2, DO, etc.)
 
+library(deSolve)
 #source zooplankton growth submodel - can use this function to determine growth rates in different environments
 setwd('~/Zoop-Fitness-Model')
 source('zoopGrowthSubmodel.R')
+
+#open data frame of model parameters
+setwd('~/Documents/Notre Dame/UNDERC 2013/zoop growth model/R files')
+modelParms<-read.csv('modelParameters_forFitnessModel.csv')
+
+#convert PAR to lx = 1ueinstein m-2 s-1 = 54 lx
+modelParms$lx<-modelParms$PAR*54
+
+#calculate reaction distances for fish - from 
+modelParms$reactionDist<-4.3*log(modelParms$lx,10)*(0.1+log(modelParms$lx,10))^-1
+#change NaNs to 0
+modelParms$reactionDist[is.na(modelParms$reactionDist)]=0
+
+#calculate encounter rates (foraging rate potential) from reaction distance and swimming speed (Daphna ~ )
 
 #run growth model on each row of model parameters
 growth<-c()
@@ -36,36 +51,26 @@ glimEPA<-(test[41,3]-EPAmin)/(EPAopt-EPAmin)
 glimDHA<-(test[41,4]-DHAmin)/(DHAopt-DHAmin)
 
 r=0.9
-growth[i]<-r*min(c(glimP,glimEPA,glimDHA))
+growthi<-r*min(c(glimP,glimEPA,glimDHA))
+growthi<-growthi*exp(-0.015*abs(20-modelParms$temp[i]))
+if(modelParms$DOmgL[i]>=1.1){
+	s=1
 }
+if(modelParms$DOmgL[i]<1.1 & modelParms$DOmgL[i]>=0.2){
+	s=sqrt(1.111*(modelParms$DOmgL-0.2))
+}
+if(modelParms$DOmgL[i]<0.2){
+	s=0
+}
+growth[i]=growthi*s
 if(is.na(modelParms$mgC_L[i]) | is.na(modelParms$PC[i]) | is.na(modelParms$EPA_mgC[i]) | is.na(modelParms$DHA_mgC[i])){
 	growth[i]=NA
 	}
 }
-
-
-
-
-
-#Epilimnion
-Topt<-20 #optimal temperature for zoop growth
-Temp<-20 #temperature of environment ###USER INPUT <------
-growth<-growth*exp(-0.015*abs(Topt-Temp)^2)
-#include cost of low O2 (Koh et al 1997) - as survivorship probability
-#if DO > 1.1 --> s=1; if 0.2<DO<1.1 --> s=sqrt(1.111*(DO-0.2)); if DO<0.2 --> s=0
-DO=5 #USER INPUT <------
-if(DO>=1.1){
-	s=1
 }
-if(DO<1.1 & DO>=0.2){
-	s=sqrt(1.111*(DO-0.2))
-}
-if(DO<0.2){
-	s=0
-}
+
 
 #calculate mortality rates
-Nm<-0.015 #natural mortality rate
 chaobDens<-400 #<---- USER INPUT	
 Pchaob<-0.1095+(0.0001302*chaobDens) #calculate predation rate for Daphnia from chaoborus
 Pchaob<-Pchaob/1000
