@@ -3,8 +3,7 @@
 #PTK 14 April 2014
 
 
-#Calculate u/g for each situation for each lake
-#+develop a function that will calculate u/g given a set of parameters - develop u from Jensen et al 2006 using reaction distances, swimming speeds, and predator density - use the submodel for growth rates - alter growth rates by costs (O2, DO, etc.)
+#Calculate u/g for each situation for each lake - use modelParms data frame to calculate u/g for each row of the data frame - will be for each PML Day/Night and Hypo Day/Night, then can compare all situations
 
 library(deSolve)
 #source zooplankton growth submodel - can use this function to determine growth rates in different environments
@@ -18,12 +17,20 @@ modelParms<-read.csv('modelParameters_forFitnessModel.csv')
 #convert PAR to lx = 1ueinstein m-2 s-1 = 54 lx
 modelParms$lx<-modelParms$PAR*54
 
-#calculate reaction distances for fish - from 
-modelParms$reactionDist<-4.3*log(modelParms$lx,10)*(0.1+log(modelParms$lx,10))^-1
+#calculate reaction distances for fish - convert to m 
+modelParms$reactionDist<-(4.3*log(modelParms$lx,10)*(0.1+log(modelParms$lx,10))^-1)/10
 #change NaNs to 0
 modelParms$reactionDist[is.na(modelParms$reactionDist)]=0
 
-#calculate encounter rates (foraging rate potential) from reaction distance and swimming speed (Daphna ~ )
+#calculate encounter rates (foraging rate potential) from reaction distance and swimming speeds.  Daphnia swimming speed = 2.26 mm s-1, fish swimming speed = 4.67 cm s-1, chaoborus = nearly 0.  reaction distance of Chaoborus = 2 mm.  Convert to m min-1 -> Daphnia = 0.1356 m min-1, fish = 2.802 m min-1
+vj=2.802 #fish swimming speed
+vi=0.1356 #Daphnia swimming speed
+Pfish<-((((pi*modelParms$reactionDist^2)/3)*((3*vj^2+vi^2)/vj)*modelParms$fish_m3)/modelParms$zoops.allDepths)*720
+
+vj=0.0001 #Chaoborus swimming speed - essentially 0
+Pchaob<-((((pi*0.002^2)/3)*((3*vj^2+vi^2)/vj)*modelParms$ind_m3)/modelParms$zoops.allDepths)*720
+
+modelParms$mu=Pfish+Pchaob
 
 #run growth model on each row of model parameters
 growth<-c()
