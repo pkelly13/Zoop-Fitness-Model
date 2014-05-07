@@ -71,37 +71,6 @@ if(is.na(modelParms$mgC_L[i]) | is.na(modelParms$PC[i]) | is.na(modelParms$EPA_m
 
 modelParms$growth=growth
 
-#Calculate mu for each lake - first do it with the predation rates taken from the literature
-
-#turn on/off chaob predation
-#if chaob = 1, use equation from the literature
-#y=(0.1095+(0.0001302*density))/1000
-#turn on/off bass presence
-#need to make a table of lakes with bass and with planktivores
-fishTable<-data.frame(lakeID=unique(modelParms$lakeID),bass=c(0,1,0,0,1,1,1,1,1,1),BLGL=c(1,1,0,0,1,1,0,1,1,1))
-mu<-c()
-for(i in 1:nrow(modelParms)){
-	if(modelParms$ind_m3[i]>0){
-		chaob=1
-	}
-	if(modelParms$ind_m3[i]==0){
-		chaob=0
-	}
-	chaobPred=((0.1095+(0.0001302*modelParms$ind_m3[i]))/1000)*chaob
-	if(modelParms$depthClass[i]=='PML' & modelParms$TOD[i]=='Day'){
-		rowi=match(modelParms$lakeID[i],fishTable$lakeID)
-		bass=fishTable$bass[rowi]
-		nobass=1-bass
-		pvores=fishTable$BLGL[rowi]
-		Pfish=((0.15*nobass)+(0.02*bass))*pvores
-	}
-	mu[i]=Pfish+chaobPred
-}
-modelParms$mu=mu
-
-#Calculate fitness - mu/g - smaller u/g value is the better situation
-modelParms$mu.g=exp(modelParms$mu)/exp(modelParms$growth)
-
 #write data to Zoop-Fitness-Model folder
 setwd('~/Zoop-Fitness-Model')
 write.csv(modelParms,'fitnessModel_parameters.csv')

@@ -155,8 +155,14 @@ for(i in 1:nrow(chaobDens)){
 
 #Add date specific DO and temp for each lake and depth
 #need to load profile data from the dB
+setwd('~/Documents/Notre Dame/database') #load the database into R - update as necessary
+library(RSQLite)
+drv=SQLite()
+con=dbConnect(drv,dbname="M2Mdb_021714.db")
 profs<-dbGetQuery(con, 'SELECT profs.lakeID,profs.dateSample,profs.depthClass,profs.depthTop,profs.temp,profs.DOmgL,profs.PAR FROM LIMNO_PROFILES AS profs')
 #use only 2013 data
+setwd('~/Documents/useful R scripts')
+source('addYear.R')
 profs<-addYear(profs)
 profs<-profs[profs$year==2013,]
 #fix dates
@@ -261,6 +267,45 @@ for(i in 1:nrow(modelParms)){
 	CPUE[i]=fish$nCPUE[rowi]
 }
 modelParms$CPUE=CPUE
+
+#Add depth-specific zoop population to calculate predation - add total and taxa specific pop density - do in ind/m3
+#need to load zooplankton data
+setwd('~/Documents/Notre Dame/UNDERC 2013/zoopData 2013/data analyses')
+source('2013DVMcharact_10Feb2014.R')
+#For loop that will take each row of modelParms and will match to specific date and depths to get population - use dvmZoops data frame
+zoops.allDepths<-c() #all zooplankton across all depths
+totZoops<-c() #all zooplankton for that specific depth class
+daphnia<-c()  #daphnia for that specific depth class
+copepods<-c() #copepods for that specific depth class
+holopedium<-c() #holopeium for that specific depth class
+for(i in 1:nrow(modelParms)){
+	samplei<-modelParms[i,]
+	zoops=dvmZoops[dvmZoops$Lake.ID==samplei$lakeID & dvmZoops$Sample.date==samplei$dateSample & dvmZoops$TOD==samplei$TOD,]
+	zoops.allDepths[i]=sum(zoops$Counts)
+	#use PML depth and pull zoops from 0-PML depth if depth is PML.  For hypo use PML depth -> lake depth
+	rowi=match(samplei$lakeID,lakeParms$lakeID)
+	PMLdepth=ceiling(lakeParms$PMLdepth[rowi])
+	if(samplei$depthClass=='PML'){
+	depthZoops=zoops[zoops$Depth.Top..m.>=0 & zoops$Depth.Top..m.<=PMLdepth,]
+	totZoops[i]=sum(depthZoops$Counts)
+	daphnia[i]=sum(depthZoops$Counts[depthZoops$Taxa=='daphnia'])
+	copepods[i]=sum(depthZoops$Counts[depthZoops$Taxa=='calanoids' | depthZoops$Taxa=='cyclopoids'])
+	holopedium[i]=sum(depthZoops$Counts[depthZoops$Taxa=='holopedium'])
+	}
+	if(samplei$depthClass=='Hypo'){
+		depthZoops=zoops[zoops$Depth.Top..m.>PMLdepth,]
+		totZoops[i]=sum(depthZoops$Counts)
+		daphnia[i]=sum(depthZoops$Counts[depthZoops$Taxa=='daphnia'])
+		copepods[i]=sum(depthZoops$Counts[depthZoops$Taxa=='calanoids' | depthZoops$Taxa=='cyclopoids'])
+		holopedium[i]=sum(depthZoops$Counts[depthZoops$Taxa=='holopedium'])
+	}
+}
+#Convert zooplankton population data into zooplankton/m3 - divide by 15 to get into zoops/L then multiply by 1000 to get in ind/m3
+modelParms$zoops.allDepths<-(zoops.allDepths/15)*1000 #add vectors as columns to model parms data
+modelParms$depthZoops<-(totZoops/15)*1000
+modelParms$Daphnia<-(daphnia/15)*1000
+modelParms$Copepods<-(copepods/15)*1000
+modelParms$Holopedium<-(holopedium/15)*1000
 
 #write csv file to zoop model folder
 setwd('~/Documents/Notre Dame/UNDERC 2013/zoop growth model/R files')
