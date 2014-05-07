@@ -268,6 +268,10 @@ for(i in 1:nrow(modelParms)){
 }
 modelParms$CPUE=CPUE
 
+#convert CPUE to fish density using density estimate from Mittelbach
+modelParms$fish_m3<-modelParms$CPUE*0.002865
+ 
+
 #Add depth-specific zoop population to calculate predation - add total and taxa specific pop density - do in ind/m3
 #need to load zooplankton data
 setwd('~/Documents/Notre Dame/UNDERC 2013/zoopData 2013/data analyses')
@@ -280,8 +284,9 @@ copepods<-c() #copepods for that specific depth class
 holopedium<-c() #holopeium for that specific depth class
 for(i in 1:nrow(modelParms)){
 	samplei<-modelParms[i,]
-	zoops=dvmZoops[dvmZoops$Lake.ID==samplei$lakeID & dvmZoops$Sample.date==samplei$dateSample & dvmZoops$TOD==samplei$TOD,]
-	zoops.allDepths[i]=sum(zoops$Counts)
+	zoops=dvmZoops[dvmZoops$Lake.ID==samplei$lakeID & dvmZoops$TOD==samplei$TOD,]
+	zoops=zoops[which(abs(as.Date(zoops$Sample.date,'%m/%d/%y')-as.Date(samplei$dateSample,'%m/%d/%y'))==min(abs(as.Date(zoops$Sample.date,'%m/%d/%y')-as.Date(samplei$dateSample,'%m/%d/%y')))),]
+	zoops.allDepths[i]=sum(zoops$Counts,na.rm=T)
 	#use PML depth and pull zoops from 0-PML depth if depth is PML.  For hypo use PML depth -> lake depth
 	rowi=match(samplei$lakeID,lakeParms$lakeID)
 	PMLdepth=ceiling(lakeParms$PMLdepth[rowi])
