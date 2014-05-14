@@ -28,7 +28,7 @@ vi=0.1356 #Daphnia swimming speed
 Pfish<-((((pi*modelParms$reactionDist^2)/3)*((3*vj^2+vi^2)/vj)*modelParms$fish_m3)/modelParms$zoops.allDepths)*720
 
 vj=0.0001 #Chaoborus swimming speed - essentially 0
-Pchaob<-((((pi*0.002^2)/3)*((3*vj^2+vi^2)/vj)*modelParms$ind_m3)/modelParms$zoops.allDepths)*720
+Pchaob<-((((pi*0.002^2)/3)*((3*vj^2+vi^2)/vj)*modelParms$ind_m3)/modelParms$Daphnia)*720
 
 modelParms$mu=Pfish+Pchaob
 
