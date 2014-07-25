@@ -1,5 +1,5 @@
 #Zooplankton DVM fitness model - objective is to determine the optimal strategy for a given lake
-#Need to include cost of swimming, and change predation rates in fitness cost of predation, i.e. probability of predation and opporunity costs involved in probability of predation imoacting future reproduction - oxygen survival ratio = model from Koh et al 1997 in Ecological modeling
+#Need to include cost of swimming, and change predation rates in fitness cost of predation, i.e. probability of predation and opporunity costs involved in probability of predation imoacting future reproduction 
 #PTK 14 April 2014
 
 
@@ -42,7 +42,7 @@ times=seq(1,500,by=1)
 
 n=c(Pint=0.5,EPAint=0.5,DHAint=0.5)
 
-test<-ode(y=n,times=times,func=timestep,parms=parms)
+test<-ode(y=n,times=times,func=timestep,parms=parms) #use parameters from the model parameters above and the zoop growth submodel to determine growth rate based on resource quality data
 
 Pmin=0.009
 Popt=0.05
@@ -58,13 +58,12 @@ glimEPA<-(test[41,3]-EPAmin)/(EPAopt-EPAmin)
 glimDHA<-(test[41,4]-DHAmin)/(DHAopt-DHAmin)
 
 r=0.9
-growthi<-r*min(c(glimP,glimEPA,glimDHA))
-growthi<-growthi*exp(-0.015*abs(20-modelParms$temp[i]))
+growthi<-r*min(c(glimP,glimEPA,glimDHA)) #maximum growth rate modified by most limiting nutrient from the growth submodel
+growthi<-growthi*exp(-0.015*abs(20-modelParms$temp[i]))  #modify growth rate again by temperature
+
+#influence of dissolved oxygen on zooplankton growth rate - take from Homer and Waller 1982 - see script "DO_zoopGrowth.R" for the determination of the function
 if(modelParms$DOmgL[i]>=1.1){
-	s=1
-}
-if(modelParms$DOmgL[i]<1.1 & modelParms$DOmgL[i]>=0.2){
-	s=sqrt(1.111*(modelParms$DOmgL-0.2))
+	s=1*(1-exp(-0.511*modelParms$DOmgL[i]))
 }
 if(modelParms$DOmgL[i]<0.2){
 	s=0

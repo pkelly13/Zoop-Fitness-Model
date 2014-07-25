@@ -7,37 +7,59 @@ modelParms<-read.csv('fitnessModel_parameters.csv')
 modelParms<-modelParms[,-c(1:3)]
 
 #add mu/g - need to exp(growth) to handle 0s and negative numbers
-modelParms$mu.g<-modelParms$mu/exp(modelParms$growth)
+modelParms$mu.g<-exp(modelParms$mu)/exp(modelParms$growth)
 
 #Go through each lake and calculate fitness comparisons for each situation for the last date
 #convert dates into matching format
 modelParms$dateSample<-format(as.Date(modelParms$dateSample,'%m/%d/%y'),'%m/%d/%y')
 
-fitness<-c()
-i=10
-lake=lakes[i]
-lakei=modelParms[modelParms$lakeID==lake,]
-day.date='07/30/13' #find day dates that correspond to plots that actually have data
-night.date='07/30/13' #same for nights
-lakej.day=lakei[lakei$TOD=='Day' & lakei$dateSample==day.date,]
-lakej.night=lakei[lakei$TOD=='Night' & lakei$dateSample==night.date,]
-normal=mean(c(lakej.day$mu.g[lakej.day$depthClass=='Hypo'],lakej.night$mu.g[lakej.night$depthClass=='PML'])) #calculate fitness for normal DVM
-reverse=mean(c(lakej.day$mu.g[lakej.day$depthClass=='PML'],lakej.night$mu.g[lakej.night$depthClass=='Hypo'])) #calculate fitness for reverse DVM
-noDVM=mean(c(lakej.day$mu.g[lakej.day$depthClass=='PML'],lakej.day$mu.g[lakej.day$depthClass=='PML'])) #calculate fitness for noDVM
-bottom=mean(c(lakej.day$mu.g[lakej.day$depthClass=='Hypo'],lakej.night$mu.g[lakej.day$depthClass=='Hypo'])) #calculate fitness for daphnia sitting on the bottom
-x=c(normal,reverse,noDVM,bottom) #make into vector
-if(min(c(normal,reverse,noDVM,bottom))==x[1]){
+#remove NAs from data
+modelParms<-modelParms[!is.na(modelParms$EPA_mgC),]
+#remove bad dates
+modelParms<-modelParms[modelParms$dateSample!='05/22/12',]
+
+#make vector of lakes
+lakes<-unique(modelParms$lakeID)
+
+fitnessTest<-c()
+for(i in 1:length(lakes)){
+lakei=modelParms[modelParms$lakeID==lakes[i],]
+night.dates=unique(lakei$dateSample[lakei$TOD=='Night']) #same for nights
+#use day data from closest date
+night.dates=night.dates[order(night.dates)]
+x=c()
+for(j in 1:length(night.dates)){
+night.data=lakei[lakei$TOD=='Night' & lakei$dateSample==night.dates[j],]
+lakei.day<-lakei[lakei$TOD=='Day',]
+day.data<-lakei.day[which(abs(as.Date(lakei$dateSample[lakei$TOD=='Day' ],'%m/%d/%y')-as.Date(night.dates[j],'%m/%d/%y'))==min(abs(as.Date(lakei$dateSample[lakei$TOD=='Day'],'%m/%d/%y')-as.Date(night.dates[j],'%m/%d/%y')))),]
+tot.data<-rbind(night.data,day.data)
+day.diff<-abs(as.Date(day.data$dateSample[1],'%m/%d/%y')-as.Date(night.dates[j],'%m/%d/%y'))
+if(nrow(tot.data)<4){
+	j=j+1
+}
+if(nrow(tot.data)==4){
+normal=mean(c(tot.data$mu.g[tot.data$depthClass=='Hypo' & tot.data$TOD=='Day'],tot.data$mu.g[tot.data$depthClass=='PML' & tot.data$TOD=='Night']),na.rm=T) #calculate fitness for normal DVM
+reverse=mean(c(tot.data$mu.g[tot.data$depthClass=='Hypo' & tot.data$TOD=='Night'],tot.data$mu.g[tot.data$depthClass=='PML' & tot.data$TOD=='Day']),na.rm=T)
+noDVM=mean(c(tot.data$mu.g[tot.data$depthClass=='PML' & tot.data$TOD=='Day'],tot.data$mu.g[tot.data$depthClass=='PML' & tot.data$TOD=='Night']),na.rm=T) #calculate fitness for noDVM
+bottom=mean(c(tot.data$mu.g[tot.data$depthClass=='Hypo' & tot.data$TOD=='Day'],tot.data$mu.g[tot.data$depthClass=='Hypo' & tot.data$TOD=='Night']),na.rm=T) #calculate fitness for daphnia sitting on the bottom
+z=c(normal,reverse,noDVM,bottom) #make into vector
+if(min(c(normal,reverse,noDVM,bottom))==z[1]){
 	optimal='normal'
 } #find minimum --> optimal strategy
-if(min(c(normal,reverse,noDVM,bottom))==x[2]){
+if(min(c(normal,reverse,noDVM,bottom))==z[2]){
 	optimal='reverse'
 }
-if(min(c(normal,reverse,noDVM,bottom))==x[3]){
+if(min(c(normal,reverse,noDVM,bottom))==z[3]){
 	optimal='noDVM'
 }
-if(min(c(normal,reverse,noDVM,bottom))==x[4]){
+if(min(c(normal,reverse,noDVM,bottom))==z[4]){
 	optimal='bottom'
 }
-y=data.frame(lakeID=lakes[i],date=day.dates[length(day.dates)],normal=normal,reverse=reverse,noDVM=noDVM,bottom=bottom,optimal=optimal)
-fitness=rbind(fitness,y) #add to fitness
-
+}
+y=data.frame(lakeID=lakes[i],date=night.dates[j],dayDifference=day.diff,normal=normal,reverse=reverse,noDVM=noDVM,bottom=bottom,optimal=optimal,pml.chaob.day=tot.data$ind_m3[tot.data$depthClass=='PML' & tot.data$TOD=='Day'],fishDens=tot.data$fish_m3[1],rxDist.pml.day=tot.data$reactionDist[tot.data$depthClass=='PML' & tot.data$TOD=='Day'],EPA.diff=tot.data$EPA_mgC[tot.data$depthClass=='PML'][1]-tot.data$EPA_mgC[tot.data$depthClass=='Hypo'][1],DHA.diff=tot.data$DHA_mgC[tot.data$depthClass=='PML'][1]-tot.data$DHA_mgC[tot.data$depthClass=='Hypo'][1],P.diff=tot.data$PC[tot.data$depthClass=='PML'][1]-tot.data$PC[tot.data$depthClass=='Hypo'][1],diff.C=tot.data$mgC_L[tot.data$depthClass=='PML'][1]-tot.data$mgC_L[tot.data$depthClass=='Hypo'][1],growth.diff=tot.data$growth[tot.data$depthClass=='PML'][1]-tot.data$growth[tot.data$depthClass=='Hypo'][1])
+x=rbind(x,y)
+}
+fitnessTest=rbind(fitnessTest,x) #add to fitness
+}
+#get rid of day differences of longer than 4 days
+fitness<-fitnessTest[fitnessTest$dayDifference<4,]
